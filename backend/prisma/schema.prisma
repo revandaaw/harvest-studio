@@ -1,0 +1,250 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  group     String   @default("general")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id          String           @id @default(uuid())
+  name        String
+  slug        String           @unique
+  description String?
+  icon        String?
+  sortOrder   Int              @default(0)
+  isActive    Boolean          @default(true)
+  packages    Package[]
+  portfolios  PortfolioAlbum[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Package {
+  id           String           @id @default(uuid())
+  categoryId   String
+  category     Category         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name         String
+  slug         String           @unique
+  description  String
+  price        Float
+  promoPrice   Float?
+  duration     String           // e.g. "60 Menit", "10 Jam"
+  locationType String           // "studio", "outdoor", "both"
+  crewCount    String           // e.g. "1 Fotografer", "2 Fotografer + 1 Videografer"
+  maxPersons   Int?             // For studio portrait limits
+  inclusions   String           // JSON string array of included items
+  badge        String?          // e.g. "Populer", "Promo", "Best Seller"
+  status       String           @default("active") // "active", "inactive", "draft"
+  coverImage   String
+  gallery      String           // JSON string array of sample image URLs
+  sortOrder    Int              @default(0)
+  bookings     Booking[]
+  portfolios   PortfolioAlbum[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model AddOn {
+  id          String   @id @default(uuid())
+  name        String
+  price       Float
+  priceType   String   @default("fixed") // "fixed", "per_hour", "per_unit"
+  categoryIds String   // JSON string array of category IDs or "ALL"
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PortfolioAlbum {
+  id          String           @id @default(uuid())
+  title       String
+  slug        String           @unique
+  categoryId  String
+  category    Category         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  packageId   String?
+  package     Package?         @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  tags        String           // JSON array of strings e.g. ["Prewedding", "Outdoor", "Sunda"]
+  eventDate   String?
+  description String?
+  coverImage  String
+  isFeatured  Boolean          @default(false)
+  sortOrder   Int              @default(0)
+  media       PortfolioMedia[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model PortfolioMedia {
+  id        String         @id @default(uuid())
+  albumId   String
+  album     PortfolioAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  type      String         @default("photo") // "photo" or "video"
+  url       String
+  caption   String?
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+}
+
+model Resource {
+  id        String          @id @default(uuid())
+  name      String
+  type      String          // "photographer", "videographer", "studio_room", "equipment"
+  status    String          @default("available") // "available", "maintenance", "off"
+  blocks    ScheduleBlock[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model ScheduleBlock {
+  id         String    @id @default(uuid())
+  resourceId String?
+  resource   Resource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  date       String    // YYYY-MM-DD
+  startTime  String?   // HH:mm
+  endTime    String?   // HH:mm
+  reason     String
+  isFullDay  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+}
+
+model Customer {
+  id        String    @id @default(uuid())
+  name      String
+  whatsapp  String    @unique
+  email     String?
+  address   String?
+  notes     String?
+  bookings  Booking[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Booking {
+  id              String    @id @default(uuid())
+  bookingCode     String    @unique // e.g. "HSV-202611-001"
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  packageId       String
+  package         Package   @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  eventDate       String    // YYYY-MM-DD
+  timeSlot        String    // e.g. "09:00 - 11:00" or "09:00"
+  location        String    // "studio" or "outdoor"
+  locationAddress String?
+  addOns          String    // JSON array of selected add-on objects
+  totalAmount     Float
+  dpAmount        Float
+  status          String    @default("PENDING_PAYMENT") // PENDING_PAYMENT, PENDING_CONFIRMATION, CONFIRMED, COMPLETED, CANCELLED
+  notes           String?
+  promoCode       String?
+  discountAmount  Float     @default(0)
+  payments        Payment[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Payment {
+  id          String    @id @default(uuid())
+  bookingId   String
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  type        String    // "DP" or "FULL"
+  amount      Float
+  method      String    // "TRANSFER_MANUAL", "QRIS_SIMULASI", "VA_SIMULASI"
+  status      String    @default("PENDING") // "PENDING", "VERIFIED", "REJECTED"
+  proofImage  String?
+  paymentDate DateTime  @default(now())
+  verifiedAt  DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model EditPrintOrder {
+  id             String   @id @default(uuid())
+  orderCode      String   @unique // e.g. "HSE-202611-001"
+  customerName   String
+  whatsapp       String
+  email          String?
+  serviceType    String   // "EDIT" or "CETAK"
+  specifications String   // JSON string of dimensions, paper type, frame, etc.
+  fileUrls       String   // JSON string array of uploaded files or cloud link
+  quantity       Int      @default(1)
+  notes          String?
+  status         String   @default("RECEIVED") // RECEIVED, IN_PROGRESS, COMPLETED, READY_DELIVERY, DELIVERED
+  deliveryMethod String   // "PICKUP" or "DELIVERY"
+  shippingAddress String?
+  totalAmount    Float
+  proofImage     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model QuotationRequest {
+  id         String   @id @default(uuid())
+  name       String
+  whatsapp   String
+  email      String?
+  eventType  String
+  eventDate  String?
+  location   String?
+  duration   String?
+  budget     String?
+  notes      String?
+  status     String   @default("NEW") // "NEW", "IN_REVIEW", "SENT", "ACCEPTED", "REJECTED"
+  adminNotes String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Voucher {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  type        String   @default("PERCENTAGE") // "PERCENTAGE" or "FIXED"
+  value       Float
+  minSpend    Float    @default(0)
+  maxDiscount Float?
+  validFrom   String
+  validUntil  String
+  quota       Int      @default(100)
+  usedCount   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Testimonial {
+  id         String   @id @default(uuid())
+  name       String
+  role       String?  // e.g. "Klien Wedding", "Keluarga Pak Budi"
+  content    String
+  rating     Int      @default(5)
+  avatar     String?
+  isFeatured Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("OWNER") // "OWNER", "ADMIN", "STAFF"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
